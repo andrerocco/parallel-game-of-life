@@ -17,14 +17,11 @@
 #include <pthread.h>
 #include "gol.h"
 
+// External global variables
+
+
 /* Statistics */
 stats_t statistics;
-/* Matrix Mutex */
-extern pthread_mutex_t matrix_mutex;
-/* Row */
-extern int row;
-/* Collumn */
-extern int collumn;
 
 cell_t **allocate_board(int size)
 {
@@ -66,80 +63,20 @@ int adjacent_to(cell_t **board, int size, int i, int j)
     return count;
 }
 
-void* routine(void* arg) {
-    args* args_ptr = (args*) arg;
-    int a;
-    int my_row; int my_collumn;
-    stats_t* stats_ = malloc(sizeof(stats_t));
-    stats_ -> borns = 0; stats_ -> overcrowding = 0; stats_ -> survivals = 0; stats_ -> loneliness = 0;
-
-    while (row < args_ptr -> size) {
-
-        pthread_mutex_lock(&matrix_mutex);
-        my_row = row;
-        my_collumn = collumn;
-
-        collumn++;
-        if (collumn >= args_ptr -> size)
-        {
-            collumn = 0;
-            row++;
-        }
-        pthread_mutex_unlock(&matrix_mutex);
-
-        if (my_row >= args_ptr -> size) break;
-
-        a = adjacent_to(args_ptr -> board, args_ptr -> size, my_row, my_collumn);
-
-            /* if cell is alive */
-            if(args_ptr -> board[my_row][my_collumn]) 
-            {
-                /* death: loneliness */
-                if(a < 2) {
-                    args_ptr -> newboard[my_row][my_collumn] = 0;
-                    stats_ -> loneliness++;
-                }
-                else
-                {
-                    /* survival */
-                    if(a == 2 || a == 3)
-                    {
-                        args_ptr -> newboard[my_row][my_collumn] = args_ptr -> board[my_row][my_collumn];
-                        stats_ -> survivals++;
-                    }
-                    else
-                    {
-                        /* death: overcrowding */
-                        if(a > 3)
-                        {
-                            args_ptr -> newboard[my_row][my_collumn] = 0;
-                            stats_ -> overcrowding++;
-                        }
-                    }
-                }
-             } 
-             else /* if cell is dead */
-            {
-                if(a == 3) /* new born */
-                {
-                    args_ptr -> newboard[my_row][my_collumn] = 1;
-                    stats_ -> borns++;
-                }
-                else /* stay unchanged */
-                    args_ptr -> newboard[my_row][my_collumn] = args_ptr -> board[my_row][my_collumn];
-            }
-    }
-    pthread_exit((void*) &stats_);
-}
-
-stats_t play(cell_t **board, cell_t **newboard, int size)
+void* play(void* arg)
 {
-    int i, j, a;
+    arguments_t *args = (arguments_t *)arg;
 
-    stats_t stats = {0, 0, 0, 0};
+    cell_t **board = args->board;  // Acesse o membro board da estrutura
+    cell_t **newboard = args->newboard;  // Acesse o membro newboard da estrutura
+    int size = args->size;  // Acesse o membro size da estrutura
+    interval_t interval_ = *(args->interval);
+    
+    stats_t *stats = args->stats;  // Acesse o membro stats da estrutura
 
-    /* for each cell, apply the rules of Life */
-    for (i = 0; i < size; i++)
+    // Linha e coluna precisam ser protegidas para que duas threads não operem na mesma célula
+    int i, j, a;  // Linha, coluna e vizinhos
+    for (i = interval_.start; i < interval_.end; i++)
     {
         for (j = 0; j < size; j++)
         {
@@ -151,7 +88,7 @@ stats_t play(cell_t **board, cell_t **newboard, int size)
                 /* death: loneliness */
                 if(a < 2) {
                     newboard[i][j] = 0;
-                    stats.loneliness++;
+                    stats->loneliness++;
                 }
                 else
                 {
@@ -159,7 +96,7 @@ stats_t play(cell_t **board, cell_t **newboard, int size)
                     if(a == 2 || a == 3)
                     {
                         newboard[i][j] = board[i][j];
-                        stats.survivals++;
+                        stats->survivals++;
                     }
                     else
                     {
@@ -167,7 +104,7 @@ stats_t play(cell_t **board, cell_t **newboard, int size)
                         if(a > 3)
                         {
                             newboard[i][j] = 0;
-                            stats.overcrowding++;
+                            stats->overcrowding++;
                         }
                     }
                 }
@@ -178,7 +115,7 @@ stats_t play(cell_t **board, cell_t **newboard, int size)
                 if(a == 3) /* new born */
                 {
                     newboard[i][j] = 1;
-                    stats.borns++;
+                    stats->borns++;
                 }
                 else /* stay unchanged */
                     newboard[i][j] = board[i][j];
@@ -186,7 +123,7 @@ stats_t play(cell_t **board, cell_t **newboard, int size)
         }
     }
 
-    return stats;
+    return NULL;
 }
 
 void print_board(cell_t **board, int size)

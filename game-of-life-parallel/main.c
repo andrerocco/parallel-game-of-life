@@ -1,10 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>  // atoi
 #include <pthread.h>
-#include <stdlib.h>
 #include "gol.h"
 
-pthread_mutex_t matrix_mutex;
-int row; int collumn;
+// Variáveis globais
+int linha_atual = 0;
+int coluna_atual = 0;
+
 
 int main(int argc, char **argv)
 {
@@ -12,10 +14,12 @@ int main(int argc, char **argv)
     cell_t **prev, **next, **tmp;
     FILE *f;
     stats_t stats_total = {0, 0, 0, 0};
+    stats_t* thread_stats;
+    interval_t* intervals;
 
     if (argc != 3)
     {
-        printf("ERRO! Você deve digitar %s <nome do arquivo do tabuleiro> <numero de threads>!\n\n", argv[0]);
+        printf("ERRO! Você deve digitar %s <nome do arquivo do tabuleiro> <número de threads>!\n\n", argv[0]);
         return 0;
     }
 
@@ -24,11 +28,16 @@ int main(int argc, char **argv)
         printf("ERRO! O arquivo de tabuleiro '%s' não existe!\n\n", argv[1]);
         return 0;
     }
+    if (atoi(argv[2]) < 1)
+    {
+        printf("ERRO! O número de threads deve ser maior que 0!\n\n");
+        return 0;
+    }
 
-    // TODO - conferir o terceiro argumento de threads
-
-    int num_threads = atoi(argv[2]);
-    pthread_t threads[num_threads];
+    int n_threads = atoi(argv[2]);
+    thread_stats = malloc(sizeof(stats_t) * n_threads);
+    intervals = malloc(sizeof(interval_t) * n_threads);
+    
 
     fscanf(f, "%d %d", &size, &steps);
 
@@ -44,34 +53,57 @@ int main(int argc, char **argv)
     print_board(prev, size);
     print_stats(stats_step);
 #endif
-    pthread_mutex_init(&matrix_mutex, NULL);
 
+    pthread_t threads[n_threads];
+
+    // After the first iteration of the loop, the board gets
+    // reset to the initial matrix
     for (int i = 0; i < steps; i++)
     {
-        for (int k = 0; k < num_threads; k++) {
-            args args_ = {prev, next, size};
-            pthread_create(&threads[i], NULL, routine, &args_);
-            printf("criou uma thread\n");
-        }
-        for (int k = 0; k < num_threads; k++) {
-            stats_t* stats_thread;
-            pthread_join(threads[k], (void**) &stats_thread);
-            stats_total.borns += stats_thread -> borns;
-            stats_total.survivals += stats_thread -> survivals;
-            stats_total.loneliness += stats_thread -> loneliness;
-            stats_total.overcrowding += stats_thread -> overcrowding;
-            //free(stats_thread);
-        }
+        int parcel = size / n_threads;
+        int leftovers = size % n_threads;
+        printf("parcel: %d, leftovers: %d\n", parcel, leftovers);
+        arguments_t arguments = {prev, next, size, NULL, NULL};
+        for (int i = 0; i < n_threads; i++)
+        {
+            /* Calculando intervalo*/
+            if (i)
+            {
+                intervals[i].start = intervals[i-1].end;
+                intervals[i].end = intervals[i].start + parcel;
+            }
+            else {
+                intervals[i].start = 0;
+                intervals[i].end = parcel;
+            }
+            if (leftovers)
+                {
+                    intervals[i].start += i;
+                    intervals[i].end++;
+                    leftovers--;
+                }
+            /**/
+            printf("start: %d, end: %d\n", intervals[i].start, intervals[i].end);
 
-        row = 0;
-        collumn = 0;
-
-        printf("\n");
-        print_board(next, size);
-        printf("\n");
+            thread_stats[i] = (stats_t){0, 0, 0, 0};
+            arguments.stats = &thread_stats[i];
+            arguments.interval = &intervals[i];
+            
+            pthread_create(&threads[i], NULL, play, &arguments);
+        }
+        for (int i = 0; i < n_threads; i++)
+        {
+            pthread_join(threads[i], NULL);
+            stats_total.borns += thread_stats[i].borns;
+            stats_total.survivals += thread_stats[i].survivals;
+            stats_total.loneliness += thread_stats[i].loneliness;
+            stats_total.overcrowding += thread_stats[i].overcrowding;
+        }
+        
 
 #ifdef DEBUG
         printf("Step %d ----------\n", i + 1);
+        print_board(prev, size);
         print_board(next, size);
         print_stats(stats_step);
 #endif
@@ -80,7 +112,8 @@ int main(int argc, char **argv)
         prev = tmp;
     }
 
-    pthread_mutex_destroy(&matrix_mutex);
+    free(thread_stats);
+    free(intervals);
 
 #ifdef RESULT
     printf("Final:\n");
@@ -90,5 +123,4 @@ int main(int argc, char **argv)
 
     free_board(prev, size);
     free_board(next, size);
-    printf("fim");
 }

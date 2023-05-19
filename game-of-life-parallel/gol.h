@@ -25,10 +25,18 @@ typedef struct {
 } stats_t;
 
 typedef struct {
-    cell_t **board; 
+    int start;
+    int end;
+} interval_t;
+
+typedef struct {
+    cell_t **board;
     cell_t **newboard;
     int size;
-} args;
+    interval_t* interval;
+    stats_t *stats;
+} arguments_t;
+
 
 /* Allocate a GoL board of size = size^2 */
 cell_t ** allocate_board(int size);
@@ -39,8 +47,8 @@ void free_board(cell_t ** board, int size);
 /* Return the number of on cells adjacent to the i,j cell */
 int adjacent_to(cell_t ** board, int size, int i, int j);
 
-/* Compute the next generation (newboard) based on the current generation (board) and returns its statistics */
-stats_t play(cell_t ** board, cell_t ** newboard, int size);
+//// /* Compute the next generation (newboard) based on the current generation (board) and returns its statistics */
+void* play(void* arg);
 
 /* Print the GoL board */
 void print_board(cell_t ** board, int size);
