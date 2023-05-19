@@ -24,6 +24,12 @@ typedef struct {
     unsigned int survivals;
 } stats_t;
 
+typedef struct {
+    cell_t **board; 
+    cell_t **newboard;
+    int size;
+} args;
+
 /* Allocate a GoL board of size = size^2 */
 cell_t ** allocate_board(int size);
 

@@ -14,10 +14,17 @@
  */
 
 #include <stdlib.h>
+#include <pthread.h>
 #include "gol.h"
 
 /* Statistics */
 stats_t statistics;
+/* Matrix Mutex */
+extern pthread_mutex_t matrix_mutex;
+/* Row */
+int row;
+/* Collumn */
+int collumn;
 
 cell_t **allocate_board(int size)
 {
@@ -57,6 +64,72 @@ int adjacent_to(cell_t **board, int size, int i, int j)
     count -= board[i][j];
 
     return count;
+}
+
+void* routine(void* arg) {
+    args* args_ptr = (args*) arg;
+    int a;
+    int my_row; int my_collumn;
+    int* stats_ = malloc(sizeof(stats_t)*4);
+    while (row < args_ptr -> size) {
+
+        pthread_mutex_lock(&matrix_mutex);
+        my_row = row;
+        my_collumn = collumn;
+
+        collumn++;
+        if (collumn >= args_ptr -> size)
+        {
+            collumn = 0;
+            row++;
+        }
+        pthread_mutex_unlock(&matrix_mutex);
+
+        printf("i: %d, j: %d\n", my_row, my_collumn);
+
+        if (my_row >= args_ptr -> size) break;
+
+        a = adjacent_to(args_ptr -> board, args_ptr -> size, my_row, my_collumn);
+
+            /* if cell is alive */
+            if(args_ptr -> board[my_row][my_collumn]) 
+            {
+                /* death: loneliness */
+                if(a < 2) {
+                    args_ptr -> newboard[my_row][my_collumn] = 0;
+                    stats_[2]++;
+                }
+                else
+                {
+                    /* survival */
+                    if(a == 2 || a == 3)
+                    {
+                        args_ptr -> newboard[my_row][my_collumn] = args_ptr -> board[my_row][my_collumn];
+                        stats_[3]++;
+                    }
+                    else
+                    {
+                        /* death: overcrowding */
+                        if(a > 3)
+                        {
+                            args_ptr -> newboard[my_row][my_collumn] = 0;
+                            stats_[1]++;
+                        }
+                    }
+                }
+             } 
+             else /* if cell is dead */
+            {
+                if(a == 3) /* new born */
+                {
+                    args_ptr -> newboard[my_row][my_collumn] = 1;
+                    stats_[0]++;
+                }
+                else /* stay unchanged */
+                    args_ptr -> newboard[my_row][my_collumn] = args_ptr -> board[my_row][my_collumn];
+            }
+    }
+    pthread_exit((void*) &stats_);
 }
 
 stats_t play(cell_t **board, cell_t **newboard, int size)
