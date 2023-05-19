@@ -1,17 +1,26 @@
 #include <stdio.h>
+#include <stdlib.h>  // atoi
+#include <pthread.h>
 #include "gol.h"
+
+// Variáveis globais
+int linha_atual = 0;
+int coluna_atual = 0;
+pthread_mutex_t matrix_mutex;
+pthread_mutex_t stats_mutex;
+
 
 int main(int argc, char **argv)
 {
     int size, steps;
     cell_t **prev, **next, **tmp;
     FILE *f;
-    stats_t stats_step = {0, 0, 0, 0};
     stats_t stats_total = {0, 0, 0, 0};
+    stats_t stats_step = {0, 0, 0, 0};
 
     if (argc != 3)
     {
-        printf("ERRO! Você deve digitar %s <nome do arquivo do tabuleiro>!\n\n", argv[0]);
+        printf("ERRO! Você deve digitar %s <nome do arquivo do tabuleiro> <número de threads>!\n\n", argv[0]);
         return 0;
     }
 
@@ -20,10 +29,13 @@ int main(int argc, char **argv)
         printf("ERRO! O arquivo de tabuleiro '%s' não existe!\n\n", argv[1]);
         return 0;
     }
+    if (atoi(argv[2]) < 1)
+    {
+        printf("ERRO! O número de threads deve ser maior que 0!\n\n");
+        return 0;
+    }
 
-    // TODO - conferir o terceiro argumento de threads
-
-    int threads = atoi(argv[2]);
+    int n_threads = atoi(argv[2]);
 
     fscanf(f, "%d %d", &size, &steps);
 
@@ -40,9 +52,25 @@ int main(int argc, char **argv)
     print_stats(stats_step);
 #endif
 
+    pthread_t threads[n_threads];
+
+    pthread_mutex_init(&matrix_mutex, NULL);
+    pthread_mutex_init(&stats_mutex, NULL);
+
+    // After the first iteration of the loop, the board gets
+    // reset to the initial matrix
     for (int i = 0; i < steps; i++)
     {
-        stats_step = play(prev, next, size);
+        stats_step = (stats_t){0, 0, 0, 0};
+        arguments_t arguments = {prev, next, size, &stats_step};
+
+        for (int i = 0; i < n_threads; i++)
+            pthread_create(&threads[i], NULL, play, &arguments);
+        for (int i = 0; i < n_threads; i++)
+            pthread_join(threads[i], NULL);
+        
+        coluna_atual = 0;
+        linha_atual = 0;
         
         stats_total.borns += stats_step.borns;
         stats_total.survivals += stats_step.survivals;
@@ -51,6 +79,7 @@ int main(int argc, char **argv)
 
 #ifdef DEBUG
         printf("Step %d ----------\n", i + 1);
+        print_board(prev, size);
         print_board(next, size);
         print_stats(stats_step);
 #endif
@@ -58,6 +87,9 @@ int main(int argc, char **argv)
         next = prev;
         prev = tmp;
     }
+
+    pthread_mutex_destroy(&matrix_mutex);
+    pthread_mutex_destroy(&stats_mutex);
 
 #ifdef RESULT
     printf("Final:\n");
