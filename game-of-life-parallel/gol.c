@@ -18,8 +18,7 @@
 #include "gol.h"
 
 // External global variables
-extern pthread_mutex_t matrix_mutex;
-extern pthread_mutex_t stats_mutex;
+
 extern int linha_atual;
 extern int coluna_atual;
 
@@ -80,7 +79,6 @@ void* play(void* arg)
     int i, j, a;  // Linha, coluna e vizinhos
 
     while (linha_atual < size) {
-        pthread_mutex_lock(&matrix_mutex);
         i = linha_atual;
         j = coluna_atual;
         coluna_atual++;  // Incrementa globalmente para que a próxima thread não opere na mesma célula
@@ -89,7 +87,6 @@ void* play(void* arg)
             coluna_atual = 0;
             linha_atual++;
         }
-        pthread_mutex_unlock(&matrix_mutex);
 
         if (i >= size) break;
 
@@ -101,23 +98,17 @@ void* play(void* arg)
         if(board[i][j]) {  // if cell is alive
             if (a < 2) {  // death: loneliness
                 newboard[i][j] = 0;
-                pthread_mutex_lock(&stats_mutex);
                 stats->loneliness++;
-                pthread_mutex_unlock(&stats_mutex);
             }
             else {  // survival
                 if (a == 2 || a == 3) {
                     newboard[i][j] = board[i][j];
-                    pthread_mutex_lock(&stats_mutex);
                     stats->survivals++;
-                    pthread_mutex_unlock(&stats_mutex);
                 }
                 else {  // death: overcrowding
                     if (a > 3) {
                         newboard[i][j] = 0;
-                        pthread_mutex_lock(&stats_mutex);
                         stats->overcrowding++;
-                        pthread_mutex_unlock(&stats_mutex);
                     }
                 }
             }
@@ -125,9 +116,7 @@ void* play(void* arg)
         else {  // if cell is dead 
             if (a == 3) {  // new born
                 newboard[i][j] = 1;
-                pthread_mutex_lock(&stats_mutex);
                 stats->borns++;
-                pthread_mutex_unlock(&stats_mutex);
             }
             else  // stay unchanged
                 newboard[i][j] = board[i][j];

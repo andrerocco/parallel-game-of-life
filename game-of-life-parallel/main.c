@@ -6,9 +6,6 @@
 // Variáveis globais
 int linha_atual = 0;
 int coluna_atual = 0;
-pthread_mutex_t matrix_mutex;
-pthread_mutex_t stats_mutex;
-
 
 int main(int argc, char **argv)
 {
@@ -54,9 +51,6 @@ int main(int argc, char **argv)
 
     pthread_t threads[n_threads];
 
-    pthread_mutex_init(&matrix_mutex, NULL);
-    pthread_mutex_init(&stats_mutex, NULL);
-
     // After the first iteration of the loop, the board gets
     // reset to the initial matrix
     for (int i = 0; i < steps; i++)
@@ -87,9 +81,6 @@ int main(int argc, char **argv)
         next = prev;
         prev = tmp;
     }
-
-    pthread_mutex_destroy(&matrix_mutex);
-    pthread_mutex_destroy(&stats_mutex);
 
 #ifdef RESULT
     printf("Final:\n");
