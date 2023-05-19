@@ -4,6 +4,7 @@
 #include "gol.h"
 
 pthread_mutex_t matrix_mutex;
+int row; int collumn;
 
 int main(int argc, char **argv)
 {
@@ -47,21 +48,26 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < steps; i++)
     {
-        for (int k = 0; i < num_threads; k++) {
+        for (int k = 0; k < num_threads; k++) {
             args args_ = {prev, next, size};
-            pthread_create(&threads[i], NULL, routine, (void*) &args_);
+            pthread_create(&threads[i], NULL, routine, &args_);
+            printf("criou uma thread\n");
         }
-        for (int k = 0; k < steps; k++) {
-            int** stats_thread;
+        for (int k = 0; k < num_threads; k++) {
+            stats_t* stats_thread;
             pthread_join(threads[k], (void**) &stats_thread);
-            stats_total.borns += (*stats_thread)[0];
-            stats_total.survivals += (*stats_thread)[3];
-            stats_total.loneliness += (*stats_thread)[2];
-            stats_total.overcrowding += (*stats_thread)[1];
-            free((*stats_thread));
+            stats_total.borns += stats_thread -> borns;
+            stats_total.survivals += stats_thread -> survivals;
+            stats_total.loneliness += stats_thread -> loneliness;
+            stats_total.overcrowding += stats_thread -> overcrowding;
+            //free(stats_thread);
         }
+
+        row = 0;
+        collumn = 0;
+
         printf("\n");
-        printf("um step");
+        print_board(next, size);
         printf("\n");
 
 #ifdef DEBUG
