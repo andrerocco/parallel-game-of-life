@@ -25,10 +25,18 @@ typedef struct {
 } stats_t;
 
 typedef struct {
-    cell_t **board;
-    cell_t **newboard;
-    int size;
-    stats_t *stats;
+    //! Double pointer porque é matriz e triple pointer porque é ponteiro para matriz
+    cell_t ***board;
+    cell_t ***newboard;
+    
+    int board_size;
+
+    //! Início e fim do chunk a ser processado
+    int start_index;  
+    int end_index;
+
+    //! Cada thread armazena as estatísticas de seu chunk localmente e elas são somadas ao final na main
+    stats_t chunk_stats;  
 } arguments_t;
 
 

@@ -3,12 +3,6 @@
 #include <pthread.h>
 #include "gol.h"
 
-// Variáveis globais
-int linha_atual = 0;
-int coluna_atual = 0;
-pthread_mutex_t matrix_mutex;
-pthread_mutex_t stats_mutex;
-
 
 int main(int argc, char **argv)
 {
@@ -16,7 +10,7 @@ int main(int argc, char **argv)
     cell_t **prev, **next, **tmp;
     FILE *f;
     stats_t stats_total = {0, 0, 0, 0};
-    stats_t stats_step = {0, 0, 0, 0};
+    stats_t stats_step = {0, 0, 0, 0};  // Utilizado apenas para fins de printing
 
     /* >>> Validação e recebimento de argumentos <<< */
     if (argc != 3) {
@@ -57,63 +51,74 @@ int main(int argc, char **argv)
     /* >>> Divisão dos chunks <<< */
     arguments_t arguments[n_threads];
 
-    int start_index = 0;
-
+    int current_index = 0;
     int chunk_size = full_size / n_threads;
-    int remainder = n_threads % full_size;
+    int remainder = full_size % n_threads;
 
+    #ifdef DEBUG
+    printf("\n\n");
+    printf("Total size: %d\n", full_size);
+    printf("Number of threads: %d\n", n_threads);
+    printf("Chunk size: %d\n", chunk_size);
+    printf("Remainder: %d\n", remainder);
+    #endif
 
     for (int i = 0; i < n_threads; i++) {
-        int end_index = start_index + chunk_size;
-        if (remainder > 0) {
-            end_index++;
-            remainder--;
+        arguments[i].start_index = current_index;
+        current_index += chunk_size;
+
+        /* >>> Alocação do chunk <<< */
+        if (i < remainder) {
+            current_index++;
         }
+        arguments[i].end_index = current_index-1;
+        
+        #ifdef DEBUG
+        printf("Thread %d: %d-%d\n", i+1, arguments[i].start_index, arguments[i].end_index);
+        #endif
+        /* <<< Alocação do chunk >>> */
 
-        // ...
-
-        start_index = end_index;
-
-        /* int endIndex = startIndex + chunkSize;
-        if (remainder > 0) {
-            endIndex++;
-            remainder--;
-        }
-
-        threadData[i].array = array;
-        threadData[i].start = startIndex;
-        threadData[i].end = endIndex;
-        pthread_create(&threads[i], NULL, computeSum, (void*)&threadData[i]);
-
-        startIndex = endIndex; */
+        /* >>> Alocação do outros argumentos <<< */        
+        // É passado o endereço da matriz para que uma mudança na matriz seja refletida na matriz
+        // de cada thread e mudanças na matriz de cada thread sejam refletidas na matriz original
+        arguments[i].board = &prev;
+        arguments[i].newboard = &next;
+        arguments[i].board_size = size;
+        arguments[i].chunk_stats = (stats_t){0, 0, 0, 0};
+        /* <<< Alocação do outros argumentos >>> */
     }
-
-    /* int chunk_size = full_size / n_threads;
-    int chunk_rest = full_size % n_threads;
-    int chunk_start = 0;
-    int chunk_end = chunk_size - 1;
-    int chunk_rest_start = full_size - chunk_rest;
-
-    int chunks[n_threads][2]; */
     /* <<< Divisão dos chunks >>> */
+    
+    #ifdef DEBUG
+    printf("\n\n");
+    #endif
+
 
     pthread_t threads[n_threads];
 
-    pthread_mutex_init(&matrix_mutex, NULL);
-    pthread_mutex_init(&stats_mutex, NULL);
-
     for (int i = 0; i < steps; i++)
     {
-        stats_step = (stats_t){0, 0, 0, 0};
-        arguments_t arguments = {prev, next, size, &stats_step};
-
         for (int i = 0; i < n_threads; i++)
-            pthread_create(&threads[i], NULL, play, &arguments);
+            pthread_create(&threads[i], NULL, play, &arguments[i]);
         for (int i = 0; i < n_threads; i++)
             pthread_join(threads[i], NULL);
-        
-        coluna_atual = 0;
-        linha_atual = 0;
+
+        for (int i = 0; i < n_threads; i++) {
+            /* printf(
+                "Thread %d: borns: %d, survivals: %d, loneliness: %d, overcrowding: %d\n", 
+                i+1,
+                arguments[i].chunk_stats.borns,
+                arguments[i].chunk_stats.survivals,
+                arguments[i].chunk_stats.loneliness,
+                arguments[i].chunk_stats.overcrowding
+            ); */
+
+            stats_step.borns += arguments[i].chunk_stats.borns;
+            stats_step.survivals += arguments[i].chunk_stats.survivals;
+            stats_step.loneliness += arguments[i].chunk_stats.loneliness;
+            stats_step.overcrowding += arguments[i].chunk_stats.overcrowding;
+            arguments[i].chunk_stats = (stats_t){0, 0, 0, 0};
+        }
         
         stats_total.borns += stats_step.borns;
         stats_total.survivals += stats_step.survivals;
@@ -122,7 +127,7 @@ int main(int argc, char **argv)
 
         #ifdef DEBUG
         printf("Step %d ----------\n", i + 1);
-        print_board(prev, size);
+        // print_board(prev, size);
         print_board(next, size);
         print_stats(stats_step);
         #endif
@@ -130,10 +135,10 @@ int main(int argc, char **argv)
         tmp = next;
         next = prev;
         prev = tmp;
+
+        stats_step = (stats_t){0, 0, 0, 0};
     }
 
-    pthread_mutex_destroy(&matrix_mutex);
-    pthread_mutex_destroy(&stats_mutex);
 
     #ifdef RESULT
     printf("Final:\n");

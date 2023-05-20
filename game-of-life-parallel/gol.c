@@ -17,15 +17,9 @@
 #include <pthread.h>
 #include "gol.h"
 
-// External global variables
-extern pthread_mutex_t matrix_mutex;
-extern pthread_mutex_t stats_mutex;
-extern int linha_atual;
-extern int coluna_atual;
-
-
 /* Statistics */
 stats_t statistics;
+
 
 cell_t **allocate_board(int size)
 {
@@ -71,6 +65,55 @@ void* play(void* arg)
 {
     arguments_t *args = (arguments_t *)arg;
 
+    cell_t ***board = args->board;  // Acessa o membro board da estrutura
+    cell_t ***newboard = args->newboard;  // Acessa o membro newboard da estrutura
+    int board_size = args->board_size;  // Acessa o membro board_size da estrutura
+
+    int start_index = args->start_index;  // Acessa o membro start_index da estrutura
+    int end_index = args->end_index;  // Acessa o membro end_index da estrutura
+
+    stats_t* stats = &(args->chunk_stats);  // Acessa o membro stats da estrutura    
+
+    
+    /* >>> Loop de calculo das células do chunk <<< */
+    // i deve ser <= a end_index, pois end_index é o último índice do chunk
+    for (int i = start_index; i <= end_index; i++) {
+        int x = i / board_size;
+        int y = i % board_size;
+
+        int a = adjacent_to(*board, board_size, x, y);
+
+        if((*board)[x][y]) {  // if cell is alive
+            if (a < 2) {  // death: loneliness
+                (*newboard)[x][y] = 0;
+                stats->loneliness++;
+            }
+            else {  // survival
+                if (a == 2 || a == 3) {
+                    (*newboard)[x][y] = (*board)[x][y];
+                    stats->survivals++;
+                }
+                else {  // death: overcrowding
+                    if (a > 3) {
+                        (*newboard)[x][y] = 0;
+                        stats->overcrowding++;
+                    }
+                }
+            }
+        }
+        else {  // if cell is dead 
+            if (a == 3) {  // new born
+                (*newboard)[x][y] = 1;
+                stats->borns++;
+            }
+            else  // stay unchanged
+                (*newboard)[x][y] = (*board)[x][y];
+        }
+    }
+
+
+    /* arguments_t *args = (arguments_t *)arg;
+
     cell_t **board = args->board;  // Acesse o membro board da estrutura
     cell_t **newboard = args->newboard;  // Acesse o membro newboard da estrutura
     int size = args->size;  // Acesse o membro size da estrutura
@@ -92,8 +135,6 @@ void* play(void* arg)
         pthread_mutex_unlock(&matrix_mutex);
 
         if (i >= size) break;
-
-        /* Faz as operações na célula */
 
         // for each cell, apply the rules of Life
         a = adjacent_to(board, size, i, j);
@@ -132,7 +173,7 @@ void* play(void* arg)
             else  // stay unchanged
                 newboard[i][j] = board[i][j];
         }
-    }
+    } */
 
     return NULL;
 }
