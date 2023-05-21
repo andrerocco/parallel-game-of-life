@@ -111,6 +111,7 @@ void* play(void* arg)
                 (*newboard)[x][y] = (*board)[x][y];
         }
     }
+    /* <<< Loop de calculo das células do chunk >>> */
 
     return NULL;
 }
