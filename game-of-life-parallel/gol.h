@@ -24,6 +24,22 @@ typedef struct {
     unsigned int survivals;
 } stats_t;
 
+typedef struct {
+    //! Double pointer porque é matriz e triple pointer porque é ponteiro para matriz
+    cell_t ***board;
+    cell_t ***newboard;
+    
+    int board_size;
+
+    //! Início e fim do chunk a ser processado
+    int start_index;  
+    int end_index;
+
+    //! Cada thread armazena as estatísticas de seu chunk localmente e elas são somadas ao final na main
+    stats_t chunk_stats;  
+} arguments_t;
+
+
 /* Allocate a GoL board of size = size^2 */
 cell_t ** allocate_board(int size);
 
@@ -33,8 +49,8 @@ void free_board(cell_t ** board, int size);
 /* Return the number of on cells adjacent to the i,j cell */
 int adjacent_to(cell_t ** board, int size, int i, int j);
 
-/* Compute the next generation (newboard) based on the current generation (board) and returns its statistics */
-stats_t play(cell_t ** board, cell_t ** newboard, int size);
+//// /* Compute the next generation (newboard) based on the current generation (board) and returns its statistics */
+void* play(void* arg);
 
 /* Print the GoL board */
 void print_board(cell_t ** board, int size);

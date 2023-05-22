@@ -14,10 +14,12 @@
  */
 
 #include <stdlib.h>
+#include <pthread.h>
 #include "gol.h"
 
 /* Statistics */
 stats_t statistics;
+
 
 cell_t **allocate_board(int size)
 {
@@ -59,61 +61,59 @@ int adjacent_to(cell_t **board, int size, int i, int j)
     return count;
 }
 
-stats_t play(cell_t **board, cell_t **newboard, int size)
+void* play(void* arg)
 {
-    int i, j, a;
+    arguments_t *args = (arguments_t *)arg;
 
-    stats_t stats = {0, 0, 0, 0};
+    /* >>> Extrai os argumentos recebidos na struct <<< */
+    cell_t ***board = args->board;
+    cell_t ***newboard = args->newboard;
+    int board_size = args->board_size;
 
-    /* for each cell, apply the rules of Life */
-    for (i = 0; i < size; i++)
-    {
-        for (j = 0; j < size; j++)
-        {
-            a = adjacent_to(board, size, i, j);
+    int start_index = args->start_index;
+    int end_index = args->end_index;
 
-            /* if cell is alive */
-            if(board[i][j]) 
-            {
-                /* death: loneliness */
-                if(a < 2) {
-                    newboard[i][j] = 0;
-                    stats.loneliness++;
-                }
-                else
-                {
-                    /* survival */
-                    if(a == 2 || a == 3)
-                    {
-                        newboard[i][j] = board[i][j];
-                        stats.survivals++;
-                    }
-                    else
-                    {
-                        /* death: overcrowding */
-                        if(a > 3)
-                        {
-                            newboard[i][j] = 0;
-                            stats.overcrowding++;
-                        }
-                    }
-                }
-                
+    stats_t* stats = &(args->chunk_stats); 
+    /* <<< Extrai os argumentos recebidos na struct >>> */
+
+    /* >>> Loop de calculo das células do chunk <<< */
+    // i deve ser <= a end_index, pois end_index é o último índice do chunk (faz parte do chunk)
+    for (int i = start_index; i <= end_index; i++) {
+        int x = i / board_size;
+        int y = i % board_size;
+
+        int a = adjacent_to(*board, board_size, x, y);
+
+        if((*board)[x][y]) {  // if cell is alive
+            if (a < 2) {  // death: loneliness
+                (*newboard)[x][y] = 0;
+                stats->loneliness++;
             }
-            else /* if cell is dead */
-            {
-                if(a == 3) /* new born */
-                {
-                    newboard[i][j] = 1;
-                    stats.borns++;
+            else {  // survival
+                if (a == 2 || a == 3) {
+                    (*newboard)[x][y] = (*board)[x][y];
+                    stats->survivals++;
                 }
-                else /* stay unchanged */
-                    newboard[i][j] = board[i][j];
+                else {  // death: overcrowding
+                    if (a > 3) {
+                        (*newboard)[x][y] = 0;
+                        stats->overcrowding++;
+                    }
+                }
             }
         }
+        else {  // if cell is dead 
+            if (a == 3) {  // new born
+                (*newboard)[x][y] = 1;
+                stats->borns++;
+            }
+            else  // stay unchanged
+                (*newboard)[x][y] = (*board)[x][y];
+        }
     }
+    /* <<< Loop de calculo das células do chunk >>> */
 
-    return stats;
+    return NULL;
 }
 
 void print_board(cell_t **board, int size)
